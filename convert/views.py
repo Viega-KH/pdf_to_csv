@@ -1,3 +1,4 @@
+import csv
 import pdfplumber
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -13,18 +14,22 @@ def pdf_to_csv_view(request):
             response = HttpResponse(content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="output.csv"'
 
-            # PDF faylni ochish
-            with pdfplumber.open(pdf_file) as pdf:
-                # Har bir sahifadagi jadvalni CSV formatida yozish
-                for page in pdf.pages:
-                    tables = page.extract_tables()
-                    for table in tables:
-                        for row in table:
-                            # Qatorlarni bo'sh joy bilan formatlash
-                            formatted_row = "    ".join([str(cell) for cell in row])
-                            response.write(formatted_row + "\n")
+            # CSV yozuvchi yaratish
+            writer = csv.writer(response, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-            return response
+            try:
+                with pdfplumber.open(pdf_file) as pdf:
+                    for page in pdf.pages:
+                        tables = page.extract_tables()
+                        if tables:
+                            for table in tables:
+                                for row in table:
+                                    # Har bir hujayrani to'g'ri formatlash
+                                    cleaned_row = [str(cell).strip() if cell else '' for cell in row]
+                                    writer.writerow(cleaned_row)
+                return response
+            except Exception as e:
+                return HttpResponse(f"Xatolik yuz berdi: {str(e)}", status=500)
     else:
         form = PDFUploadForm()
 
